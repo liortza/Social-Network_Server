@@ -4,11 +4,12 @@ public class Login extends Message {
     String username, password;
     byte capcha;
 
-    public Login(int id, String username, String password, byte capcha) {
+    public Login(int id, String username, String password, String capcha) {
         super(Type.LOGIN, id);
         this.username = username;
         this.password = password;
-        this.capcha = capcha;
+        if (capcha.equals("0")) this.capcha = 0;
+        else this.capcha = 1;
     }
 
     public byte getCapcha() {

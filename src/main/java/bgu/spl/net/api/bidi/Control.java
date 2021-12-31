@@ -32,13 +32,13 @@ public class Control<T extends Message> {
     public boolean handleRegister(Register register) {
         int id = register.getId();
         if (isRegistered(id)) {
-            connections.send(id, new Error(Message.Type.REGISTER.ordinal()));
+            connections.send(id, new Error((short) Message.Type.REGISTER.ordinal()));
             return false;
         }
         Client client = new Client(id, register.getUserName(), register.getPassword(), register.getAge());
         usernames.put(register.getUserName(), id);
         clients.put(id, client);
-        connections.send(id, new Ack(Message.Type.REGISTER.ordinal()));
+        connections.send(id, new Ack((short) Message.Type.REGISTER.ordinal()));
         return true;
     }
 
@@ -46,21 +46,21 @@ public class Control<T extends Message> {
         int id = login.getId();
         if (!isRegistered(id) || isLoggedIn(id) ||
                 login.getCapcha() == 0 | !login.getPassword().equals(clients.get(id).getPassword())) {
-            connections.send(id, new Error(Message.Type.LOGIN.ordinal()));
+            connections.send(id, new Error((short) Message.Type.LOGIN.ordinal()));
             return;
         }
         clients.get(id).logIn();
-        connections.send(id, new Ack(Message.Type.LOGIN.ordinal()));
+        connections.send(id, new Ack((short) Message.Type.LOGIN.ordinal()));
     }
 
     public void handleLogout(Logout logout) {
         int id = logout.getId();
         if (!isLoggedIn(id)) {
-            connections.send(id, new Error(Message.Type.LOGOUT.ordinal()));
+            connections.send(id, new Error((short) Message.Type.LOGOUT.ordinal()));
             return;
         }
         clients.get(id).logOut();
-        connections.send(id, new Ack(Message.Type.LOGOUT.ordinal()));
+        connections.send(id, new Ack((short) Message.Type.LOGOUT.ordinal()));
     }
 
     public void handleFollow(Follow follow) {
@@ -69,25 +69,25 @@ public class Control<T extends Message> {
         Client me = clients.get(id);
         Client toFollow = clients.get(toFollowId);
         if (!isLoggedIn(id) | !isRegistered(toFollow.getId())) {
-            connections.send(id, new Error(Message.Type.FOLLOW.ordinal()));
+            connections.send(id, new Error((short) Message.Type.FOLLOW.ordinal()));
             return;
         }
 
         ConcurrentLinkedQueue<Integer> followers = me.getFollowers();
         if (follow.followAction()) { // case follow
             if (followers.contains(toFollow.getId()) | me.isBlocked(toFollowId) | toFollow.isBlocked(id)) // TODO: need to return error??
-                connections.send(id, new Error(Message.Type.FOLLOW.ordinal()));
+                connections.send(id, new Error((short) Message.Type.FOLLOW.ordinal()));
             else {
                 me.incrementFollowing();
                 toFollow.addFollower(id);
-                connections.send(id, new Ack(Message.Type.FOLLOW.ordinal(), 0, follow.getUserToFollow()));
+                connections.send(id, new Ack((short) Message.Type.FOLLOW.ordinal(), 0, follow.getUserToFollow()));
             }
         } else { // case unfollow
-            if (!followers.contains(toFollow.getId())) connections.send(id, new Error(Message.Type.FOLLOW.ordinal()));
+            if (!followers.contains(toFollow.getId())) connections.send(id, new Error((short) Message.Type.FOLLOW.ordinal()));
             else {
                 me.decrementFollowing();
                 toFollow.removeFollower(id);
-                connections.send(id, new Ack(Message.Type.FOLLOW.ordinal(), 1, follow.getUserToFollow()));
+                connections.send(id, new Ack((short) Message.Type.FOLLOW.ordinal(), 1, follow.getUserToFollow()));
             }
         }
     }
@@ -96,7 +96,7 @@ public class Control<T extends Message> {
         int id = post.getId();
         Client me = clients.get(id);
         if (!isLoggedIn(id)) {
-            connections.send(id, new Error(Message.Type.POST.ordinal()));
+            connections.send(id, new Error((short) Message.Type.POST.ordinal()));
             return;
         }
         Set<Integer> toSend = new HashSet<>(clients.get(id).getFollowers());
@@ -112,7 +112,7 @@ public class Control<T extends Message> {
         }
 
         postsAndPm.add(post.getContent());
-        connections.send(id, new Ack(Message.Type.POST.ordinal()));
+        connections.send(id, new Ack((short) Message.Type.POST.ordinal()));
 
         // send to all relevant users
         String postingUser = clients.get(id).getUserName();
@@ -129,15 +129,15 @@ public class Control<T extends Message> {
             recipientId = usernames.get(pm.getRecipient());
             recipient = clients.get(recipientId);
         }
-        if (!isLoggedIn(id)) connections.send(id, new Error(Message.Type.PM.ordinal()));
+        if (!isLoggedIn(id)) connections.send(id, new Error((short) Message.Type.PM.ordinal()));
         else if (recipient == null) // recipient is not registered
-            connections.send(id, new Error(Message.Type.PM.ordinal(), "@" + pm.getRecipient() + " isn't applicable for private messages"));
+            connections.send(id, new Error((short) Message.Type.PM.ordinal(), "@" + pm.getRecipient() + " isn't applicable for private messages"));
         else if (!clients.get(recipientId).isFollower(id) || me.isBlocked(recipientId) | recipient.isBlocked(id)) // sender isn't following recipient
-            connections.send(id, new Error(Message.Type.PM.ordinal())); // TODO: error??
+            connections.send(id, new Error((short) Message.Type.PM.ordinal())); // TODO: error??
         else {
             String filtered = filter(pm.getContent());
             postsAndPm.add(filtered);
-            connections.send(id, new Ack(Message.Type.PM.ordinal()));
+            connections.send(id, new Ack((short) Message.Type.PM.ordinal()));
             connections.send(recipientId, new Notification(Message.Type.PM, clients.get(id).getUserName(), filtered));
         }
     }
@@ -152,21 +152,21 @@ public class Control<T extends Message> {
     public void handleLogStat(LogStat logStat) {
         int id = logStat.getId();
         if (!isLoggedIn(id)) {
-            connections.send(id, new Error(Message.Type.LOGSTAT.ordinal()));
+            connections.send(id, new Error((short) Message.Type.LOGSTAT.ordinal()));
             return;
         }
         for (Client client : clients.values()) {
             int currentId = client.getId();
             Client current = clients.get(currentId);
             if (currentId != id & isLoggedIn(currentId) & !current.isBlocked(id)) // doesn't get his own stat, and not of those who blocked me
-                connections.send(id, singleStat(Message.Type.LOGSTAT.ordinal(), currentId));
+                connections.send(id, singleStat((short) Message.Type.LOGSTAT.ordinal(), currentId));
         }
     }
 
     public void handleStat(Stat stat) {
         int id = stat.getId();
         if (!isLoggedIn(id)) {
-            connections.send(id, new Error(Message.Type.STAT.ordinal()));
+            connections.send(id, new Error((short) Message.Type.STAT.ordinal()));
             return;
         }
         LinkedList<String> statUsernames = stat.getUsernames();
@@ -174,12 +174,12 @@ public class Control<T extends Message> {
             if (usernames.containsKey(username)) { // send stat of registered requested users
                 Client current = clients.get(usernames.get(username));
                 if (!current.isBlocked(id))
-                    connections.send(id, singleStat(Message.Type.STAT.ordinal(), usernames.get(username)));
+                    connections.send(id, singleStat((short) Message.Type.STAT.ordinal(), usernames.get(username)));
             }
         }
     }
 
-    private Ack singleStat(int opcode, int id) {
+    private Ack singleStat(short opcode, int id) {
         Client client = clients.get(id); // assuming client is logged in, not blocked
         return new Ack(opcode, client.getAge(), client.getNumPosts(), client.getNumFollowers(), client.getNumFollowing());
     }
@@ -187,7 +187,7 @@ public class Control<T extends Message> {
     public void handleBlock(Block block) {
         int id = block.getId();
         if (!isLoggedIn(id)) {
-            connections.send(id, new Error(Message.Type.BLOCK.ordinal()));
+            connections.send(id, new Error((short) Message.Type.BLOCK.ordinal()));
             return;
         }
         if (usernames.containsKey(block.getToBlock())) {
