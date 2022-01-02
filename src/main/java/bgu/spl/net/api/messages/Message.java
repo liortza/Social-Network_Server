@@ -7,11 +7,11 @@ public abstract class Message {
     }
 
     protected Type type;
-    protected int id;
+    protected int connId;
 
-    public Message(Type type, int id) {
+    public Message(Type type, int connID) {
         this.type = type;
-        this.id = id;
+        this.connId = connID;
     }
 
     public Message(Type type) {
@@ -22,8 +22,8 @@ public abstract class Message {
         return type;
     }
 
-    public int getId() {
-        return id;
+    public int getConnId() {
+        return connId;
     }
 
     public byte[] toBytes() {

@@ -2,22 +2,23 @@ package bgu.spl.net.srv;
 
 import bgu.spl.net.api.messages.Notification;
 
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Client {
-    private final int id;
+    private int connId;
     private boolean loggedIn;
     private final String userName;
     private final String password;
     private final int age;
-    private final ConcurrentLinkedQueue<Integer> followers;
+    private final ConcurrentLinkedQueue<Client> followers;
     private int following;
-    private final ConcurrentLinkedQueue<Integer> blocked;
+    private final ConcurrentLinkedQueue<Client> blocked;
     private int numPosts;
     private final ConcurrentLinkedQueue<Notification> notifications;
 
-    public Client(int id, String userName, String password, int age) {
-        this.id = id;
+    public Client(int connId, String userName, String password, int age) {
+        this.connId = connId;
         loggedIn = false;
         this.userName = userName;
         this.password = password;
@@ -29,15 +30,17 @@ public class Client {
         notifications = new ConcurrentLinkedQueue<>();
     }
 
-    public int getId() {
-        return id;
+    public int getConnId() {
+        return connId;
     }
+
+    public void setConnId(int connId) { this.connId = connId; }
 
     public String getUserName() {
         return userName;
     }
 
-    public boolean getLoggedIn() {
+    public boolean isLoggedIn() {
         return loggedIn;
     }
 
@@ -73,9 +76,9 @@ public class Client {
         following--;
     }
 
-    public boolean isFollower(int id) { return followers.contains(id); }
+    public boolean isFollower(Client client) { return followers.contains(client); }
 
-    public ConcurrentLinkedQueue<Integer> getFollowers() {
+    public ConcurrentLinkedQueue<Client> getFollowers() {
         return followers;
     }
 
@@ -83,23 +86,32 @@ public class Client {
         return followers.size();
     }
 
-    public void addFollower(int id) {
-        followers.add(id);
+    public void addFollower(Client client) {
+        followers.add(client);
     }
 
-    public void removeFollower(int id) {
-        followers.remove(id);
+    public void removeFollower(Client toRemove) {
+        followers.remove(toRemove);
     }
 
     public int getNumFollowing() {
         return following;
     }
 
-    public void addBlocked(int id) {
-        blocked.add(id);
+    public void addBlocked(Client blocked) {
+        this.blocked.add(blocked);
     }
 
-    public boolean isBlocked(int id) {
-        return blocked.contains(id);
+    public boolean isBlocked(Client client) {
+        return blocked.contains(client);
     }
+
+    public void addNotification(Notification n) {
+        notifications.add(n);
+    }
+
+    public ConcurrentLinkedQueue<Notification> getNotifications() {
+        return notifications;
+    }
+
 }

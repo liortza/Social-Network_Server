@@ -17,13 +17,13 @@ public class BGSProtocol implements BidiMessagingProtocol<Message>{
     public void start(int connectionId, Connections<Message> connections) {
         this.connectionId = connectionId;
         this.connections = connections;
-        ((ConnectionsImpl<Message>) connections).connect(connectionId, handler);
+        ((ConnectionsImpl) connections).connect(connectionId, handler);
     }
 
     public void process(Message msg) { // only client -> server messages
         switch (msg.getType()) {
             case REGISTER:
-                if (control.handleRegister((Register) msg)) start(msg.getId(), connections);
+                control.handleRegister((Register) msg);
                 break;
             case LOGIN:
                 control.handleLogin((Login) msg);

@@ -5,22 +5,22 @@ import bgu.spl.net.srv.ConnectionHandler;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ConnectionsImpl<T extends Message> implements Connections<T> {
-    private final ConcurrentHashMap<Integer, ConnectionHandler<T>> connections = new ConcurrentHashMap<>();
+public class ConnectionsImpl implements Connections<Message> {
+    private final ConcurrentHashMap<Integer, ConnectionHandler<Message>> connections = new ConcurrentHashMap<>();
 
-    public boolean send(int connectionId, T msg) {
+    public boolean send(int connectionId, Message msg) {
         if (connections.containsKey(connectionId)) {
             connections.get(connectionId).send(msg);
             return true;
         } return false;
     }
 
-    public void broadcast(T msg) {
-        for (ConnectionHandler<T> handler: connections.values())
+    public void broadcast(Message msg) {
+        for (ConnectionHandler<Message> handler: connections.values())
             handler.send(msg);
     }
 
-    public void connect(int connectionId, ConnectionHandler<T> handler) {
+    public void connect(int connectionId, ConnectionHandler<Message> handler) {
         if (!connections.containsKey(connectionId))
             connections.put(connectionId, handler);
     }
@@ -29,7 +29,4 @@ public class ConnectionsImpl<T extends Message> implements Connections<T> {
         connections.remove(connectionId);
     }
 
-    public ConnectionHandler<T> getConnection(int connectionId) {
-        return connections.get(connectionId);
-    }
 }
