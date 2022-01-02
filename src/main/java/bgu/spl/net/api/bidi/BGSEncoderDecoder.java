@@ -2,7 +2,6 @@ package bgu.spl.net.api.bidi;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
 import bgu.spl.net.api.messages.*;
-import com.sun.xml.internal.ws.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -14,7 +13,7 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     private LinkedList<String> msgInput;
     private int len = 0, byteCounter = 0;
     private short opCode = -1;
-    private int id;
+    private int connId;
 
     @Override
     public Message decodeNextByte(byte nextByte) {
@@ -68,7 +67,7 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     public BGSEncoderDecoder(int id) {
-        this.id = id;
+        this.connId = id;
     }
 
     // region DECODE
@@ -87,19 +86,19 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     private Message buildRegister(LinkedList<String> msgInput) {
-        return new Register(id, msgInput.get(0), msgInput.get(1), msgInput.get(2));
+        return new Register(connId, msgInput.get(0), msgInput.get(1), msgInput.get(2));
     }
 
     private Message buildLogin(LinkedList<String> msgInput) {
-        return new Login(id, msgInput.get(0), msgInput.get(1), msgInput.get(2));
+        return new Login(connId, msgInput.get(0), msgInput.get(1), msgInput.get(2));
     }
 
     private Message buildLogout() {
-        return new Logout(id);
+        return new Logout(connId);
     }
 
     private Message buildFollow(LinkedList<String> msgInput) {
-        return new Follow(id, Integer.parseInt(msgInput.get(0)), msgInput.get(1));
+        return new Follow(connId, Integer.parseInt(msgInput.get(0)), msgInput.get(1));
     }
 
     private Message buildPost(LinkedList<String> msgInput) {
@@ -113,15 +112,15 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
             content = content.substring(endIndex + 1);
             startIndex = content.indexOf('@');
         }
-        return new Post(id, msgInput.get(0), taggedUsers);
+        return new Post(connId, msgInput.get(0), taggedUsers);
     }
 
     private Message buildPM(LinkedList<String> msgInput) {
-        return new PM(id, msgInput.get(0), msgInput.get(1), msgInput.get(2));
+        return new PM(connId, msgInput.get(0), msgInput.get(1), msgInput.get(2));
     }
 
     private Message buildLogStat() {
-        return new LogStat(id);
+        return new LogStat(connId);
     }
 
     private Message buildStat(LinkedList<String> msgInput) {
@@ -133,11 +132,11 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
             usernames.add(input.substring(0, endIndex));
             input = input.substring(endIndex + 1);
         }
-        return new Stat(id, usernames);
+        return new Stat(connId, usernames);
     }
 
     private Message buildBlock(LinkedList<String> msgInput) {
-        return new Block(id, msgInput.get(0));
+        return new Block(connId, msgInput.get(0));
     }
     // endregion
 }

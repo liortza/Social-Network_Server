@@ -13,133 +13,145 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class Control<T extends Message> {
     private final Connections<Message> connections;
     private final String[] filtered = new String[]{" BBZNOT ", " WEED "};
-    private final ConcurrentHashMap<String, Integer> usernames = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Integer, Client> clients = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Client> usernameToClient = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, Client> idToClient = new ConcurrentHashMap<>();
     private final ConcurrentLinkedQueue<String> postsAndPm = new ConcurrentLinkedQueue<>();
 
     public Control(Connections<Message> connections) {
         this.connections = connections;
     }
 
-    private boolean isRegistered(int id) {
-        return clients.containsKey(id);
+    private boolean isRegistered(String username) {
+        return usernameToClient.containsKey(username);
     }
 
-    private boolean isLoggedIn(int id) {
-        return isRegistered(id) && clients.get(id).getLoggedIn();
+    private boolean isLoggedIn(int connId) {
+        return idToClient.containsKey(connId);
     }
 
-    public boolean handleRegister(Register register) {
-        int id = register.getId();
-        if (isRegistered(id)) {
-            connections.send(id, new Error((short) Message.Type.REGISTER.ordinal()));
-            return false;
-        }
-        Client client = new Client(id, register.getUserName(), register.getPassword(), register.getAge());
-        usernames.put(register.getUserName(), id);
-        clients.put(id, client);
-        connections.send(id, new Ack((short) Message.Type.REGISTER.ordinal()));
-        return true;
+    public void handleRegister(Register register) {
+        String username = register.getUserName();
+        int connId = register.getConnId();
+        if (isRegistered(username))
+            connections.send(connId, new Error((short) Message.Type.REGISTER.ordinal()));
+
+        Client client = new Client(connId, register.getUserName(), register.getPassword(), register.getAge());
+        usernameToClient.put(username, client);
+        connections.send(connId, new Ack((short) Message.Type.REGISTER.ordinal()));
     }
 
     public void handleLogin(Login login) {
-        int id = login.getId();
-        if (!isRegistered(id) || isLoggedIn(id) ||
-                login.getCapcha() == 0 | !login.getPassword().equals(clients.get(id).getPassword())) {
-            connections.send(id, new Error((short) Message.Type.LOGIN.ordinal()));
+        int connId = login.getConnId();
+        Client client = usernameToClient.get(login.getUsername());
+        if (!isRegistered(client.getUserName()) || isLoggedIn(connId) ||
+                login.getCapcha() == 0 | !login.getPassword().equals(usernameToClient.get(client.getUserName()).getPassword())) {
+            connections.send(connId, new Error((short) Message.Type.LOGIN.ordinal()));
             return;
         }
-        clients.get(id).logIn();
-        connections.send(id, new Ack((short) Message.Type.LOGIN.ordinal()));
+        idToClient.put(connId, client);
+        client.logIn();
+        client.setConnId(connId);
+        connections.send(connId, new Ack((short) Message.Type.LOGIN.ordinal()));
+        ConcurrentLinkedQueue<Notification> notifications = client.getNotifications();
+        while (!notifications.isEmpty()) connections.send(connId, notifications.remove());
     }
 
     public void handleLogout(Logout logout) {
-        int id = logout.getId();
-        if (!isLoggedIn(id)) {
-            connections.send(id, new Error((short) Message.Type.LOGOUT.ordinal()));
+        int connId = logout.getConnId();
+        if (!isLoggedIn(connId)) {
+            connections.send(connId, new Error((short) Message.Type.LOGOUT.ordinal()));
             return;
         }
-        clients.get(id).logOut();
-        connections.send(id, new Ack((short) Message.Type.LOGOUT.ordinal()));
+        idToClient.get(connId).logOut();
+        idToClient.remove(connId);
+        connections.send(connId, new Ack((short) Message.Type.LOGOUT.ordinal()));
+        connections.disconnect(connId);
     }
 
     public void handleFollow(Follow follow) {
-        int id = follow.getId();
-        int toFollowId = usernames.get(follow.getUserToFollow());
-        Client me = clients.get(id);
-        Client toFollow = clients.get(toFollowId);
-        if (!isLoggedIn(id) | !isRegistered(toFollow.getId())) {
-            connections.send(id, new Error((short) Message.Type.FOLLOW.ordinal()));
+        int connId = follow.getConnId();
+        Client me = idToClient.get(connId);
+        Client toFollow = usernameToClient.get(follow.getUserToFollow());
+        if (!isLoggedIn(connId) | !isRegistered(toFollow.getUserName())) {
+            connections.send(connId, new Error((short) Message.Type.FOLLOW.ordinal()));
             return;
         }
 
-        ConcurrentLinkedQueue<Integer> followers = me.getFollowers();
+        ConcurrentLinkedQueue<Client> followers = me.getFollowers();
         if (follow.followAction()) { // case follow
-            if (followers.contains(toFollow.getId()) | me.isBlocked(toFollowId) | toFollow.isBlocked(id)) // TODO: need to return error??
-                connections.send(id, new Error((short) Message.Type.FOLLOW.ordinal()));
+            if (followers.contains(toFollow) | me.isBlocked(toFollow) | toFollow.isBlocked(me))
+                connections.send(connId, new Error((short) Message.Type.FOLLOW.ordinal()));
             else {
                 me.incrementFollowing();
-                toFollow.addFollower(id);
-                connections.send(id, new Ack((short) Message.Type.FOLLOW.ordinal(), 0, follow.getUserToFollow()));
+                toFollow.addFollower(me);
+                connections.send(connId, new Ack((short) Message.Type.FOLLOW.ordinal(), 0, follow.getUserToFollow()));
             }
         } else { // case unfollow
-            if (!followers.contains(toFollow.getId())) connections.send(id, new Error((short) Message.Type.FOLLOW.ordinal()));
+            if (!followers.contains(toFollow))
+                connections.send(connId, new Error((short) Message.Type.FOLLOW.ordinal()));
             else {
                 me.decrementFollowing();
-                toFollow.removeFollower(id);
-                connections.send(id, new Ack((short) Message.Type.FOLLOW.ordinal(), 1, follow.getUserToFollow()));
+                toFollow.removeFollower(me);
+                connections.send(connId, new Ack((short) Message.Type.FOLLOW.ordinal(), 1, follow.getUserToFollow()));
             }
         }
     }
 
     public void handlePost(Post post) {
-        int id = post.getId();
-        Client me = clients.get(id);
-        if (!isLoggedIn(id)) {
-            connections.send(id, new Error((short) Message.Type.POST.ordinal()));
+        int connId = post.getConnId();
+        Client me = idToClient.get(connId);
+        if (!isLoggedIn(connId)) {
+            connections.send(connId, new Error((short) Message.Type.POST.ordinal()));
             return;
         }
-        Set<Integer> toSend = new HashSet<>(clients.get(id).getFollowers());
+        Set<Client> toSend = new HashSet<>(me.getFollowers());
         LinkedList<String> taggedUsers = post.getTaggedUsers();
 
         // add all registered taggedUsers users to toSend
         for (String username : taggedUsers) {
-            if (usernames.containsKey(username)) {
-                int taggedId = usernames.get(username);
-                Client tagged = clients.get(taggedId);
-                if (!tagged.isBlocked(id) & !me.isBlocked(taggedId)) toSend.add(taggedId);
+            if (isRegistered(username)) {
+                Client tagged = usernameToClient.get(username);
+                if (!tagged.isBlocked(me) & !me.isBlocked(tagged)) toSend.add(tagged);
             }
         }
 
         postsAndPm.add(post.getContent());
-        connections.send(id, new Ack((short) Message.Type.POST.ordinal()));
+        connections.send(connId, new Ack((short) Message.Type.POST.ordinal()));
 
         // send to all relevant users
-        String postingUser = clients.get(id).getUserName();
-        for (int i : toSend)
-            connections.send(i, new Notification(Message.Type.POST, postingUser, post.getContent()));
+        String postingUser = me.getUserName();
+        for (Client c : toSend) {
+            Notification notification = new Notification(Message.Type.POST, postingUser, post.getContent());
+            if (c.isLoggedIn())
+                connections.send(c.getConnId(), notification);
+            else c.addNotification(notification);
+        }
     }
 
     public void handlePM(PM pm) {
-        int id = pm.getId();
-        Client me = clients.get(id);
-        int recipientId = -1;
-        Client recipient = null;
-        if (usernames.containsKey(pm.getRecipient())) {
-            recipientId = usernames.get(pm.getRecipient());
-            recipient = clients.get(recipientId);
+        int connId = pm.getConnId();
+        Client me = idToClient.get(connId);
+        if (!isLoggedIn(connId)) { // sender is not logged in
+            connections.send(connId, new Error((short) Message.Type.PM.ordinal()));
+            return;
         }
-        if (!isLoggedIn(id)) connections.send(id, new Error((short) Message.Type.PM.ordinal()));
-        else if (recipient == null) // recipient is not registered
-            connections.send(id, new Error((short) Message.Type.PM.ordinal(), "@" + pm.getRecipient() + " isn't applicable for private messages"));
-        else if (!clients.get(recipientId).isFollower(id) || me.isBlocked(recipientId) | recipient.isBlocked(id)) // sender isn't following recipient
-            connections.send(id, new Error((short) Message.Type.PM.ordinal())); // TODO: error??
-        else {
-            String filtered = filter(pm.getContent());
-            postsAndPm.add(filtered);
-            connections.send(id, new Ack((short) Message.Type.PM.ordinal()));
-            connections.send(recipientId, new Notification(Message.Type.PM, clients.get(id).getUserName(), filtered));
+        if (!isRegistered(pm.getRecipient())) { // recipient is not registered
+            connections.send(connId, new Error((short) Message.Type.PM.ordinal(), "@" + pm.getRecipient() + " isn't applicable for private messages"));
+            return;
         }
+        Client recipient = usernameToClient.get(pm.getRecipient());
+        int recipientConnId = recipient.getConnId();
+        if (!recipient.isFollower(me) || me.isBlocked(recipient) | recipient.isBlocked(me)) { // sender isn't following recipient or blocked
+            connections.send(connId, new Error((short) Message.Type.PM.ordinal()));
+            return;
+        }
+        String filtered = filter(pm.getContent());
+        postsAndPm.add(filtered);
+        connections.send(connId, new Ack((short) Message.Type.PM.ordinal()));
+        Notification notification = new Notification(Message.Type.PM, me.getUserName(), filtered);
+        if (recipient.isLoggedIn())
+            connections.send(recipientConnId, notification);
+        else recipient.addNotification(notification);
     }
 
     private String filter(String content) {
@@ -150,59 +162,62 @@ public class Control<T extends Message> {
     }
 
     public void handleLogStat(LogStat logStat) {
-        int id = logStat.getId();
-        if (!isLoggedIn(id)) {
-            connections.send(id, new Error((short) Message.Type.LOGSTAT.ordinal()));
+        int connId = logStat.getConnId();
+        if (!isLoggedIn(connId)) {
+            connections.send(connId, new Error((short) Message.Type.LOGSTAT.ordinal()));
             return;
         }
-        for (Client client : clients.values()) {
-            int currentId = client.getId();
-            Client current = clients.get(currentId);
-            if (currentId != id & isLoggedIn(currentId) & !current.isBlocked(id)) // doesn't get his own stat, and not of those who blocked me
-                connections.send(id, singleStat((short) Message.Type.LOGSTAT.ordinal(), currentId));
+        Client me = idToClient.get(connId);
+        for (Client client : idToClient.values()) {
+            if (!me.equals(client) & !client.isBlocked(me)) // doesn't get his own stat, and not of those who blocked me
+                connections.send(connId, singleStat((short) Message.Type.LOGSTAT.ordinal(), client));
         }
     }
 
     public void handleStat(Stat stat) {
-        int id = stat.getId();
-        if (!isLoggedIn(id)) {
-            connections.send(id, new Error((short) Message.Type.STAT.ordinal()));
+        int connId = stat.getConnId();
+        if (!isLoggedIn(connId)) {
+            connections.send(connId, new Error((short) Message.Type.STAT.ordinal()));
             return;
         }
+        Client me = idToClient.get(connId);
         LinkedList<String> statUsernames = stat.getUsernames();
         for (String username : statUsernames) {
-            if (usernames.containsKey(username)) { // send stat of registered requested users
-                Client current = clients.get(usernames.get(username));
-                if (!current.isBlocked(id))
-                    connections.send(id, singleStat((short) Message.Type.STAT.ordinal(), usernames.get(username)));
+            if (isRegistered(username)) { // send stat of registered requested users
+                Client current = usernameToClient.get(username);
+                if (!current.isBlocked(me))
+                    connections.send(connId, singleStat((short) Message.Type.STAT.ordinal(), current));
             }
         }
     }
 
-    private Ack singleStat(short opcode, int id) {
-        Client client = clients.get(id); // assuming client is logged in, not blocked
+    private Ack singleStat(short opcode, Client client) { // assuming client is logged in, not blocked
         return new Ack(opcode, client.getAge(), client.getNumPosts(), client.getNumFollowers(), client.getNumFollowing());
     }
 
     public void handleBlock(Block block) {
-        int id = block.getId();
-        if (!isLoggedIn(id)) {
-            connections.send(id, new Error((short) Message.Type.BLOCK.ordinal()));
+        int connId = block.getConnId();
+        if (!isLoggedIn(connId)) {
+            connections.send(connId, new Error((short) Message.Type.BLOCK.ordinal()));
             return;
         }
-        if (usernames.containsKey(block.getToBlock())) {
-            int toBlockId = usernames.get(block.getToBlock());
-            Client toBlock = clients.get(toBlockId);
-            Client blocking = clients.get(id);
-            blocking.addBlocked(toBlockId);
-            if (blocking.isFollower(toBlockId)) {
-                blocking.removeFollower(toBlockId);
+        if (isRegistered(block.getToBlock())) {
+            Client toBlock = usernameToClient.get(block.getToBlock());
+            Client me = idToClient.get(connId);
+            if (me.isBlocked(toBlock)) {
+                connections.send(connId, new Error((short) Message.Type.BLOCK.ordinal()));
+                return;
+            }
+            me.addBlocked(toBlock);
+            if (me.isFollower(toBlock)) {
+                me.removeFollower(toBlock);
                 toBlock.decrementFollowing();
             }
-            if (toBlock.isFollower(id)) {
-                toBlock.removeFollower(id);
-                blocking.decrementFollowing();
+            if (toBlock.isFollower(me)) {
+                toBlock.removeFollower(me);
+                me.decrementFollowing();
             }
+            connections.send(connId, new Ack((short) Message.Type.BLOCK.ordinal()));
         }
     }
 

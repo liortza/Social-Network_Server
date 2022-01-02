@@ -2,20 +2,16 @@ package bgu.spl.net.api.messages;
 
 public class Notification extends Message {
 
-    private String type;
-    private byte notificationType;
-    private String postingUser, content;
-    private short myOpcode = 9;
+    private final byte notificationType;
+    private final String postingUser;
+    private final String content;
+    private final short myOpcode = 9;
 
     public Notification(Message.Type type, String postingUser, String content) {
         super(Type.NOTIFICATION);
-        if (type == Type.PM) {
-            this.type = "PM";
-            notificationType = 0;
-        } else { // post
-            this.type ="PUBLIC";
-            notificationType = 1;
-        }
+        if (type == Type.PM) notificationType = 0;
+        else notificationType = 1; // post
+
         this.postingUser = postingUser;
         this.content = content;
     }
