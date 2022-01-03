@@ -66,8 +66,8 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
         return result;
     }
 
-    public BGSEncoderDecoder(int id) {
-        this.connId = id;
+    public void setConnId(int connId) {
+        this.connId = connId;
     }
 
     // region DECODE

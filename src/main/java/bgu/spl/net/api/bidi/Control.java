@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class Control<T extends Message> {
+public class Control {
     private final Connections<Message> connections;
     private final String[] filtered = new String[]{" BBZNOT ", " WEED "};
     private final ConcurrentHashMap<String, Client> usernameToClient = new ConcurrentHashMap<>();

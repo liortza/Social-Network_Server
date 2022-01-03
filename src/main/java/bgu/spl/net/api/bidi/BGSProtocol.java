@@ -7,10 +7,10 @@ public class BGSProtocol implements BidiMessagingProtocol<Message>{
     private boolean shouldTerminate = false;
     private int connectionId;
     private Connections<Message> connections;
-    private Control<Message> control;
+    private Control control;
     private ConnectionHandler<Message> handler;
 
-    public BGSProtocol(Control<Message> control) {
+    public BGSProtocol(Control control) {
         this.control = control;
     }
 
