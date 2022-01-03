@@ -9,7 +9,8 @@ public class Register extends Message {
         super(Type.REGISTER, id);
         this.userName = userName;
         this.password = password;
-        // TODO: age <- bday
+        String year = bday.substring(6);
+        age = 2022 - Integer.parseInt(year);
     }
 
     public String getUserName() { return userName; }

@@ -2,6 +2,11 @@ package bgu.spl.net.srv;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
 import bgu.spl.net.api.MessagingProtocol;
+import bgu.spl.net.api.bidi.BidiMessagingProtocol;
+import bgu.spl.net.api.bidi.Connections;
+import bgu.spl.net.api.bidi.Control;
+import bgu.spl.net.api.messages.Message;
+
 import java.io.Closeable;
 import java.util.function.Supplier;
 
@@ -17,21 +22,21 @@ public interface Server<T> extends Closeable {
      * @param port The port for the server socket
      * @param protocolFactory A factory that creates new MessagingProtocols
      * @param encoderDecoderFactory A factory that creates new MessageEncoderDecoder
-     * @param <T> The Message Object for the protocol
+     //* @param <T> The Message Object for the protocol
      * @return A new Thread per client server
      */
-    public static <T> Server<T> threadPerClient(
+    public static Server<Message> threadPerClient(
             int port,
-            Supplier<MessagingProtocol<T> > protocolFactory,
-            Supplier<MessageEncoderDecoder<T> > encoderDecoderFactory) {
+            Supplier<BidiMessagingProtocol<Message>> protocolFactory,
+            Supplier<MessageEncoderDecoder<Message> > encoderDecoderFactory,
+            Connections<Message> connections) {
 
-        return new BaseServer<T>(port, protocolFactory, encoderDecoderFactory) {
+        return new BaseServer<Message>(port, protocolFactory, encoderDecoderFactory, connections) {
             @Override
-            protected void execute(BlockingConnectionHandler<T>  handler) {
+            protected void execute(BlockingConnectionHandler<Message> handler) {
                 new Thread(handler).start();
             }
         };
-
     }
 
     /**
@@ -40,15 +45,16 @@ public interface Server<T> extends Closeable {
      * @param port The port for the server socket
      * @param protocolFactory A factory that creats new MessagingProtocols
      * @param encoderDecoderFactory A factory that creats new MessageEncoderDecoder
-     * @param <T> The Message Object for the protocol
+     //* @param <T> The Message Object for the protocol
      * @return A new reactor server
      */
-    public static <T> Server<T> reactor(
+    public static Server<Message> reactor(
             int nthreads,
             int port,
-            Supplier<MessagingProtocol<T>> protocolFactory,
-            Supplier<MessageEncoderDecoder<T>> encoderDecoderFactory) {
-        return new Reactor<T>(nthreads, port, protocolFactory, encoderDecoderFactory);
+            Supplier<BidiMessagingProtocol<Message>> protocolFactory,
+            Supplier<MessageEncoderDecoder<Message>> encoderDecoderFactory,
+            Connections<Message> connections) {
+        return new Reactor<>(nthreads, port, protocolFactory, encoderDecoderFactory, connections);
     }
 
 }

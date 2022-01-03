@@ -2,8 +2,10 @@ package bgu.spl.net.srv;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
 import bgu.spl.net.api.MessagingProtocol;
+import bgu.spl.net.api.bidi.BidiMessagingProtocol;
 import bgu.spl.net.api.bidi.Connections;
 import bgu.spl.net.api.bidi.ConnectionsImpl;
+import bgu.spl.net.api.messages.Message;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -13,23 +15,24 @@ import java.util.function.Supplier;
 public abstract class BaseServer<T> implements Server<T> {
 
     private final int port;
-    private final Supplier<MessagingProtocol<T>> protocolFactory;
+    private final Supplier<BidiMessagingProtocol<T>> protocolFactory;
     private final Supplier<MessageEncoderDecoder<T>> encdecFactory;
     private ServerSocket sock;
     private int chCounter;
-    private final Connections<T> connections;
+    private final Connections<Message> connections;
 
     public BaseServer(
             int port,
-            Supplier<MessagingProtocol<T>> protocolFactory,
-            Supplier<MessageEncoderDecoder<T>> encdecFactory) {
+            Supplier<BidiMessagingProtocol<T>> protocolFactory,
+            Supplier<MessageEncoderDecoder<T>> encdecFactory,
+            Connections<Message> connections) {
 
         this.port = port;
         this.protocolFactory = protocolFactory;
         this.encdecFactory = encdecFactory;
 		this.sock = null;
 		chCounter = 0;
-		connections = (Connections<T>) new ConnectionsImpl(); // TODO: generics?? type?
+		this.connections = connections; // TODO: generics?? type?
     }
 
     @Override
