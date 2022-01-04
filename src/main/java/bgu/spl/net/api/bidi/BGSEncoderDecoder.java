@@ -10,7 +10,7 @@ import java.util.LinkedList;
 public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
 
     private byte[] bytes = new byte[1 << 10]; //start with 1k
-    private LinkedList<String> msgInput;
+    private LinkedList<String> msgInput = new LinkedList<>();
     private int len = 0, byteCounter = 0;
     private short opCode = -1;
     private int connId;
@@ -19,29 +19,33 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     public Message decodeNextByte(byte nextByte) {
         //notice that the top 128 ascii characters have the same representation as their utf-8 counterparts
         //this allow us to do the following comparison
+        System.out.println("nextByte: " + nextByte);
         if (nextByte == ';') { // end of message
+            Message result = buildMsg(msgInput);
             msgInput.clear();
             byteCounter = 0;
             opCode = -1;
-            return buildMsg(opCode, msgInput);
+            return result;
         } else { // continue read message
-            byteCounter++;
+            pushByte(nextByte);
+            System.out.println("byte counter: " + byteCounter);
+            if (byteCounter == 2) { // opcode
+                opCode = bytesToShort(bytes);
+                len = 0;
+            }
             if (nextByte == '\0') { // next word
-                msgInput.add(popString());
-            } else {
-                pushByte(nextByte);
-                if (byteCounter == 2) { // opcode
-                    opCode = bytesToShort(bytes);
-                    len = 0;
-                }
+                System.out.println("found 0");
+                String nextWord = popString();
+                if (!nextWord.isEmpty()) msgInput.add(nextWord);
             }
             return null; // not a full message yet
         }
     }
 
     public short bytesToShort(byte[] byteArr) {
-        short result = (short)((byteArr[0] & 0xff) << 8);
-        result += (short)(byteArr[1] & 0xff);
+        short result = (short) ((byteArr[1] & 0xff) << 8);
+        result += (short) (byteArr[0] & 0xff); // TODO: changed indexes!!!
+        System.out.println("opcode: " + result);
         return result;
     }
 
@@ -51,11 +55,14 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     private void pushByte(byte nextByte) {
-        if (len >= bytes.length) {
-            bytes = Arrays.copyOf(bytes, len * 2);
-        }
+        byteCounter++;
+        if (nextByte != '\0') {
+            if (len >= bytes.length) {
+                bytes = Arrays.copyOf(bytes, len * 2);
+            }
 
-        bytes[len++] = nextByte;
+            bytes[len++] = nextByte;
+        }
     }
 
     private String popString() {
@@ -63,6 +70,7 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
         //this is not actually required as it is the default encoding in java.
         String result = new String(bytes, 0, len, StandardCharsets.UTF_8);
         len = 0;
+        System.out.println("next word: " + result);
         return result;
     }
 
@@ -71,17 +79,27 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     // region DECODE
-    private Message buildMsg(int opCode, LinkedList<String> msgInput) {
+    private Message buildMsg(LinkedList<String> msgInput) {
+        System.out.println(opCode);
         switch (opCode) {
-            case 1: return buildRegister(msgInput);
-            case 2: return buildLogin(msgInput);
-            case 3: return buildLogout();
-            case 4: return buildFollow(msgInput);
-            case 5: return buildPost(msgInput);
-            case 6: return buildPM(msgInput);
-            case 7: return buildLogStat();
-            case 8: return buildStat(msgInput);
-            default: return buildBlock(msgInput);
+            case 1:
+                return buildRegister(msgInput);
+            case 2:
+                return buildLogin(msgInput);
+            case 3:
+                return buildLogout();
+            case 4:
+                return buildFollow(msgInput);
+            case 5:
+                return buildPost(msgInput);
+            case 6:
+                return buildPM(msgInput);
+            case 7:
+                return buildLogStat();
+            case 8:
+                return buildStat(msgInput);
+            default:
+                return buildBlock(msgInput);
         }
     }
 
