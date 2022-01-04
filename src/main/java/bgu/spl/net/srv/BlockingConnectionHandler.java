@@ -1,10 +1,7 @@
 package bgu.spl.net.srv;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
-import bgu.spl.net.api.bidi.BGSEncoderDecoder;
-import bgu.spl.net.api.bidi.BidiMessagingProtocol;
-import bgu.spl.net.api.bidi.Connections;
-import bgu.spl.net.api.bidi.Control;
+import bgu.spl.net.api.bidi.*;
 import bgu.spl.net.api.messages.Message;
 
 import java.io.BufferedInputStream;
@@ -39,10 +36,12 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
             in = new BufferedInputStream(sock.getInputStream());
             out = new BufferedOutputStream(sock.getOutputStream());
 
+            ((BGSProtocol) protocol).setHandler((ConnectionHandler<Message>) this);
             protocol.start(connId, (Connections<T>) connections); // todo: casting??
             ((BGSEncoderDecoder) encdec).setConnId(connId); // todo: casting??
 
             while (!protocol.shouldTerminate() && connected && (read = in.read()) >= 0) {
+                System.out.println("reading from client");
                 T nextMessage = encdec.decodeNextByte((byte) read);
                 if (nextMessage != null) protocol.process(nextMessage);
             }
