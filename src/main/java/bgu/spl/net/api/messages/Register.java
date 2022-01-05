@@ -5,8 +5,8 @@ public class Register extends Message {
     private final String userName, password;
     private int age;
 
-    public Register(int id, String userName, String password, String bday) {
-        super(Type.REGISTER, id);
+    public Register(int connId, String userName, String password, String bday) {
+        super(Type.REGISTER, connId);
         this.userName = userName;
         this.password = password;
         String year = bday.substring(6);

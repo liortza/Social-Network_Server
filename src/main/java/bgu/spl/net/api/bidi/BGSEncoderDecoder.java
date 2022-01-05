@@ -10,42 +10,33 @@ import java.util.LinkedList;
 public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
 
     private byte[] bytes = new byte[1 << 10]; //start with 1k
-    private LinkedList<String> msgInput = new LinkedList<>();
-    private int len = 0, byteCounter = 0;
-    private short opCode = -1;
+    private String[] msgInput;
+    private int len = 0;
+    private short opCode;
     private int connId;
 
     @Override
     public Message decodeNextByte(byte nextByte) {
         //notice that the top 128 ascii characters have the same representation as their utf-8 counterparts
         //this allow us to do the following comparison
-        System.out.println("nextByte: " + nextByte);
         if (nextByte == ';') { // end of message
-            Message result = buildMsg(msgInput);
-            msgInput.clear();
-            byteCounter = 0;
-            opCode = -1;
-            return result;
-        } else { // continue read message
-            pushByte(nextByte);
-            System.out.println("byte counter: " + byteCounter);
-            if (byteCounter == 2) { // opcode
-                opCode = bytesToShort(bytes);
-                len = 0;
-            }
-            if (nextByte == '\0') { // next word
-                System.out.println("found 0");
-                String nextWord = popString();
-                if (!nextWord.isEmpty()) msgInput.add(nextWord);
-            }
-            return null; // not a full message yet
-        }
+            String popString = popString();
+            processPopString(popString);
+            return buildMsg();
+        } // continue read message
+        pushByte(nextByte);
+        if (len == 2) opCode = bytesToShort(bytes); // opcode
+        return null; // not a full message yet
+    }
+
+    private void processPopString(String popString) {
+        popString = popString.substring(2);
+        msgInput = popString.split("\0");
     }
 
     public short bytesToShort(byte[] byteArr) {
-        short result = (short) ((byteArr[1] & 0xff) << 8);
-        result += (short) (byteArr[0] & 0xff); // TODO: changed indexes!!!
-        System.out.println("opcode: " + result);
+        short result = (short) ((byteArr[0] & 0xff) << 8);
+        result += (short) (byteArr[1] & 0xff);
         return result;
     }
 
@@ -55,14 +46,11 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     private void pushByte(byte nextByte) {
-        byteCounter++;
-        if (nextByte != '\0') {
-            if (len >= bytes.length) {
-                bytes = Arrays.copyOf(bytes, len * 2);
-            }
-
-            bytes[len++] = nextByte;
+        if (len >= bytes.length) {
+            bytes = Arrays.copyOf(bytes, len * 2);
         }
+
+        bytes[len++] = nextByte;
     }
 
     private String popString() {
@@ -70,7 +58,6 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
         //this is not actually required as it is the default encoding in java.
         String result = new String(bytes, 0, len, StandardCharsets.UTF_8);
         len = 0;
-        System.out.println("next word: " + result);
         return result;
     }
 
@@ -79,48 +66,48 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     // region DECODE
-    private Message buildMsg(LinkedList<String> msgInput) {
-        System.out.println(opCode);
+    private Message buildMsg() {
         switch (opCode) {
             case 1:
-                return buildRegister(msgInput);
+                return buildRegister();
             case 2:
-                return buildLogin(msgInput);
+                return buildLogin();
             case 3:
                 return buildLogout();
             case 4:
-                return buildFollow(msgInput);
+                return buildFollow();
             case 5:
-                return buildPost(msgInput);
+                return buildPost();
             case 6:
-                return buildPM(msgInput);
+                return buildPM();
             case 7:
                 return buildLogStat();
             case 8:
-                return buildStat(msgInput);
+                return buildStat();
             default:
-                return buildBlock(msgInput);
+                return buildBlock();
         }
     }
 
-    private Message buildRegister(LinkedList<String> msgInput) {
-        return new Register(connId, msgInput.get(0), msgInput.get(1), msgInput.get(2));
+    private Message buildRegister() {
+        Register register = new Register(connId, msgInput[0], msgInput[1], msgInput[2]);
+        return register;
     }
 
-    private Message buildLogin(LinkedList<String> msgInput) {
-        return new Login(connId, msgInput.get(0), msgInput.get(1), msgInput.get(2));
+    private Message buildLogin() {
+        return new Login(connId, msgInput[0], msgInput[1], msgInput[2]);
     }
 
     private Message buildLogout() {
         return new Logout(connId);
     }
 
-    private Message buildFollow(LinkedList<String> msgInput) {
-        return new Follow(connId, Integer.parseInt(msgInput.get(0)), msgInput.get(1));
+    private Message buildFollow() {
+        return new Follow(connId, Integer.parseInt(msgInput[0]), msgInput[1]);
     }
 
-    private Message buildPost(LinkedList<String> msgInput) {
-        String content = msgInput.get(0); // TODO: check original content stays ok
+    private Message buildPost() {
+        String content = msgInput[0]; // TODO: check original content stays ok
         LinkedList<String> taggedUsers = new LinkedList<>();
         int startIndex = content.indexOf('@'), endIndex;
         while (startIndex != -1) {
@@ -130,20 +117,20 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
             content = content.substring(endIndex + 1);
             startIndex = content.indexOf('@');
         }
-        return new Post(connId, msgInput.get(0), taggedUsers);
+        return new Post(connId, msgInput[0], taggedUsers);
     }
 
-    private Message buildPM(LinkedList<String> msgInput) {
-        return new PM(connId, msgInput.get(0), msgInput.get(1), msgInput.get(2));
+    private Message buildPM() {
+        return new PM(connId, msgInput[0], msgInput[1], msgInput[2]);
     }
 
     private Message buildLogStat() {
         return new LogStat(connId);
     }
 
-    private Message buildStat(LinkedList<String> msgInput) {
+    private Message buildStat() {
         LinkedList<String> usernames = new LinkedList<>();
-        String input = msgInput.get(0);
+        String input = msgInput[0];
         int endIndex;
         while (!input.isEmpty()) {
             endIndex = input.indexOf('|');
@@ -153,8 +140,8 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
         return new Stat(connId, usernames);
     }
 
-    private Message buildBlock(LinkedList<String> msgInput) {
-        return new Block(connId, msgInput.get(0));
+    private Message buildBlock() {
+        return new Block(connId, msgInput[0]);
     }
     // endregion
 }

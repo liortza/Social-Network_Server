@@ -6,8 +6,8 @@ public class Post extends Message {
     private final String content;
     private final LinkedList<String> taggedUsers;
 
-    public Post(int id, String content, LinkedList<String> taggedUsers) {
-        super(Type.POST, id);
+    public Post(int connId, String content, LinkedList<String> taggedUsers) {
+        super(Type.POST, connId);
         this.content = content;
         this.taggedUsers = taggedUsers;
     }

@@ -22,14 +22,13 @@ public class Notification extends Message {
         byte[] postingUser = this.postingUser.getBytes();
         byte[] content = this.content.getBytes();
         byte[] myOp = shortToBytes(myOpcode);
-        byte[] result = new byte[6 + postingUser.length + content.length];
+        byte[] result = new byte[5 + postingUser.length + content.length];
         System.arraycopy(myOp, 0, result, 0, 2);
         result[2] = notificationType;
         System.arraycopy(postingUser, 0, result, 3, postingUser.length);
-        index = 2 + postingUser.length;
+        index = 3 + postingUser.length;
         result[index] = '\0';
         System.arraycopy(content, 0, result, index + 1, content.length);
-        result[result.length - 2] = '\0';
         result[result.length - 1] = ';';
         return result;
     }

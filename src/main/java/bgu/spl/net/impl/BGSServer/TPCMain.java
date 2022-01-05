@@ -6,7 +6,6 @@ import bgu.spl.net.srv.Server;
 
 public class TPCMain {
     public static void main(String[] args) {
-        System.out.println("TCPMain");
         Connections<Message> connections = new ConnectionsImpl();
         Control control = new Control(connections);
 
