@@ -41,7 +41,6 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
             ((BGSEncoderDecoder) encdec).setConnId(connId); // todo: casting??
 
             while (!protocol.shouldTerminate() && connected && (read = in.read()) >= 0) {
-                System.out.println("reading from client");
                 T nextMessage = encdec.decodeNextByte((byte) read);
                 if (nextMessage != null) protocol.process(nextMessage);
             }

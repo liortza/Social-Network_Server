@@ -43,7 +43,7 @@ public class Control {
     public void handleLogin(Login login) {
         int connId = login.getConnId();
         Client client = usernameToClient.get(login.getUsername());
-        if (!isRegistered(client.getUserName()) || isLoggedIn(connId) ||
+        if (client == null || !isRegistered(client.getUserName()) || isLoggedIn(connId) ||
                 login.getCapcha() == 0 | !login.getPassword().equals(usernameToClient.get(client.getUserName()).getPassword())) {
             connections.send(connId, new Error((short) Message.Type.LOGIN.ordinal()));
             return;
@@ -58,28 +58,28 @@ public class Control {
 
     public void handleLogout(Logout logout) {
         int connId = logout.getConnId();
-        if (!isLoggedIn(connId)) {
-            connections.send(connId, new Error((short) Message.Type.LOGOUT.ordinal()));
+        if (isLoggedIn(connId)) {
+            idToClient.get(connId).logOut();
+            idToClient.remove(connId);
+            connections.send(connId, new Ack((short) Message.Type.LOGOUT.ordinal()));
+            connections.disconnect(connId);
             return;
         }
-        idToClient.get(connId).logOut();
-        idToClient.remove(connId);
-        connections.send(connId, new Ack((short) Message.Type.LOGOUT.ordinal()));
-        connections.disconnect(connId);
+        connections.send(connId, new Error((short) Message.Type.LOGOUT.ordinal()));
     }
 
     public void handleFollow(Follow follow) {
         int connId = follow.getConnId();
         Client me = idToClient.get(connId);
         Client toFollow = usernameToClient.get(follow.getUserToFollow());
-        if (!isLoggedIn(connId) | !isRegistered(toFollow.getUserName())) {
+        if (toFollow == null || !isLoggedIn(connId) | !isRegistered(toFollow.getUserName())) {
             connections.send(connId, new Error((short) Message.Type.FOLLOW.ordinal()));
             return;
         }
 
-        ConcurrentLinkedQueue<Client> followers = me.getFollowers();
+        ConcurrentLinkedQueue<Client> followers = toFollow.getFollowers();
         if (follow.followAction()) { // case follow
-            if (followers.contains(toFollow) | me.isBlocked(toFollow) | toFollow.isBlocked(me))
+            if (followers.contains(me) | me.isBlocked(toFollow) | toFollow.isBlocked(me))
                 connections.send(connId, new Error((short) Message.Type.FOLLOW.ordinal()));
             else {
                 me.incrementFollowing();
@@ -111,7 +111,7 @@ public class Control {
         for (String username : taggedUsers) {
             if (isRegistered(username)) {
                 Client tagged = usernameToClient.get(username);
-                if (!tagged.isBlocked(me) & !me.isBlocked(tagged)) toSend.add(tagged);
+                if (tagged != null && !tagged.isBlocked(me) & !me.isBlocked(tagged)) toSend.add(tagged);
             }
         }
 
@@ -136,7 +136,7 @@ public class Control {
             return;
         }
         if (!isRegistered(pm.getRecipient())) { // recipient is not registered
-            connections.send(connId, new Error((short) Message.Type.PM.ordinal(), "@" + pm.getRecipient() + " isn't applicable for private messages"));
+            connections.send(connId, new Error((short) Message.Type.PM.ordinal(), " @" + pm.getRecipient() + " isn't applicable for private messages"));
             return;
         }
         Client recipient = usernameToClient.get(pm.getRecipient());
