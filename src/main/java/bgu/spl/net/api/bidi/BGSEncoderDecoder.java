@@ -90,11 +90,12 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     private Message buildRegister() {
-        Register register = new Register(connId, msgInput[0], msgInput[1], msgInput[2]);
-        return register;
+        if (msgInput.length != 3) return null;
+        return new Register(connId, msgInput[0], msgInput[1], msgInput[2]);
     }
 
     private Message buildLogin() {
+        if (msgInput.length != 3) return null;
         return new Login(connId, msgInput[0], msgInput[1], msgInput[2]);
     }
 
@@ -103,24 +104,32 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     private Message buildFollow() {
+        if (msgInput.length != 2) return null;
         return new Follow(connId, Integer.parseInt(msgInput[0]), msgInput[1]);
     }
 
     private Message buildPost() {
+        if (msgInput.length != 1) return null;
         String content = msgInput[0]; // TODO: check original content stays ok
         LinkedList<String> taggedUsers = new LinkedList<>();
-        int startIndex = content.indexOf('@'), endIndex;
-        while (startIndex != -1) {
-            content = content.substring(startIndex + 1);
-            endIndex = content.indexOf(' ');
-            taggedUsers.add(content.substring(0, endIndex));
-            content = content.substring(endIndex + 1);
+        int startIndex, endIndex;
+        while (content.contains("@")) {
             startIndex = content.indexOf('@');
+            content = content.substring(startIndex + 1);
+            if (content.contains(" ")) {
+                endIndex = content.indexOf(' ');
+                taggedUsers.add(content.substring(0, endIndex));
+                content = content.substring(endIndex + 1);
+            } else {
+                taggedUsers.add(content);
+                break;
+            }
         }
         return new Post(connId, msgInput[0], taggedUsers);
     }
 
     private Message buildPM() {
+        if (msgInput.length != 3) return null;
         return new PM(connId, msgInput[0], msgInput[1], msgInput[2]);
     }
 
@@ -129,18 +138,21 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
     }
 
     private Message buildStat() {
+        if (msgInput.length != 1) return null;
         LinkedList<String> usernames = new LinkedList<>();
         String input = msgInput[0];
         int endIndex;
-        while (!input.isEmpty()) {
+        while (input.contains("|")) {
             endIndex = input.indexOf('|');
             usernames.add(input.substring(0, endIndex));
             input = input.substring(endIndex + 1);
         }
+        usernames.add(input);
         return new Stat(connId, usernames);
     }
 
     private Message buildBlock() {
+        if (msgInput.length != 1) return null;
         return new Block(connId, msgInput[0]);
     }
     // endregion

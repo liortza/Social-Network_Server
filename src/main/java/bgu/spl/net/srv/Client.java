@@ -10,14 +10,14 @@ public class Client {
     private boolean loggedIn;
     private final String userName;
     private final String password;
-    private final int age;
+    private final short age;
     private final ConcurrentLinkedQueue<Client> followers;
-    private int following;
+    private short following;
     private final ConcurrentLinkedQueue<Client> blocked;
-    private int numPosts;
+    private short numPosts;
     private final ConcurrentLinkedQueue<Notification> notifications;
 
-    public Client(int connId, String userName, String password, int age) {
+    public Client(int connId, String userName, String password, short age) {
         this.connId = connId;
         loggedIn = false;
         this.userName = userName;
@@ -56,11 +56,11 @@ public class Client {
         return password;
     }
 
-    public int getAge() {
+    public short getAge() {
         return age;
     }
 
-    public int getNumPosts() {
+    public short getNumPosts() {
         return numPosts;
     }
 
@@ -82,8 +82,8 @@ public class Client {
         return followers;
     }
 
-    public int getNumFollowers() {
-        return followers.size();
+    public short getNumFollowers() {
+        return (short) followers.size();
     }
 
     public void addFollower(Client client) {
@@ -94,7 +94,7 @@ public class Client {
         followers.remove(toRemove);
     }
 
-    public int getNumFollowing() {
+    public short getNumFollowing() {
         return following;
     }
 

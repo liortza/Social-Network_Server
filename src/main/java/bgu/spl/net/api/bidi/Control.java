@@ -34,7 +34,6 @@ public class Control {
         int connId = register.getConnId();
         if (isRegistered(username))
             connections.send(connId, new Error((short) Message.Type.REGISTER.ordinal()));
-
         Client client = new Client(connId, register.getUserName(), register.getPassword(), register.getAge());
         usernameToClient.put(username, client);
         connections.send(connId, new Ack((short) Message.Type.REGISTER.ordinal()));
@@ -58,14 +57,14 @@ public class Control {
 
     public void handleLogout(Logout logout) {
         int connId = logout.getConnId();
-        if (isLoggedIn(connId)) {
-            idToClient.get(connId).logOut();
-            idToClient.remove(connId);
-            connections.send(connId, new Ack((short) Message.Type.LOGOUT.ordinal()));
-            connections.disconnect(connId);
+        if (!isLoggedIn(connId)) {
+            connections.send(connId, new Error((short) Message.Type.LOGOUT.ordinal()));
             return;
         }
-        connections.send(connId, new Error((short) Message.Type.LOGOUT.ordinal()));
+        idToClient.get(connId).logOut();
+        idToClient.remove(connId);
+        connections.send(connId, new Ack((short) Message.Type.LOGOUT.ordinal()));
+        connections.disconnect(connId);
     }
 
     public void handleFollow(Follow follow) {
@@ -79,20 +78,20 @@ public class Control {
 
         ConcurrentLinkedQueue<Client> followers = toFollow.getFollowers();
         if (follow.followAction()) { // case follow
-            if (followers.contains(me) | me.isBlocked(toFollow) | toFollow.isBlocked(me))
+            if (followers.contains(me) | isBlockedBiDi(me, toFollow))
                 connections.send(connId, new Error((short) Message.Type.FOLLOW.ordinal()));
             else {
                 me.incrementFollowing();
                 toFollow.addFollower(me);
-                connections.send(connId, new Ack((short) Message.Type.FOLLOW.ordinal(), 0, follow.getUserToFollow()));
+                connections.send(connId, new Ack((short) Message.Type.FOLLOW.ordinal(), follow.getUserToFollow()));
             }
         } else { // case unfollow
-            if (!followers.contains(toFollow))
+            if (!followers.contains(me))
                 connections.send(connId, new Error((short) Message.Type.FOLLOW.ordinal()));
             else {
                 me.decrementFollowing();
                 toFollow.removeFollower(me);
-                connections.send(connId, new Ack((short) Message.Type.FOLLOW.ordinal(), 1, follow.getUserToFollow()));
+                connections.send(connId, new Ack((short) Message.Type.FOLLOW.ordinal(), follow.getUserToFollow()));
             }
         }
     }
@@ -111,10 +110,11 @@ public class Control {
         for (String username : taggedUsers) {
             if (isRegistered(username)) {
                 Client tagged = usernameToClient.get(username);
-                if (tagged != null && !tagged.isBlocked(me) & !me.isBlocked(tagged)) toSend.add(tagged);
+                if (tagged != null && !isBlockedBiDi(me, tagged)) toSend.add(tagged);
             }
         }
 
+        me.incrementPosts();
         postsAndPm.add(post.getContent());
         connections.send(connId, new Ack((short) Message.Type.POST.ordinal()));
 
@@ -141,7 +141,7 @@ public class Control {
         }
         Client recipient = usernameToClient.get(pm.getRecipient());
         int recipientConnId = recipient.getConnId();
-        if (!recipient.isFollower(me) || me.isBlocked(recipient) | recipient.isBlocked(me)) { // sender isn't following recipient or blocked
+        if (!recipient.isFollower(me) || isBlockedBiDi(me, recipient)) { // sender isn't following recipient or blocked
             connections.send(connId, new Error((short) Message.Type.PM.ordinal()));
             return;
         }
@@ -169,7 +169,7 @@ public class Control {
         }
         Client me = idToClient.get(connId);
         for (Client client : idToClient.values()) {
-            if (!me.equals(client) & !client.isBlocked(me)) // doesn't get his own stat, and not of those who blocked me
+            if (!me.equals(client) & !isBlockedBiDi(me, client)) // doesn't get his own stat, and not of those who blocked me
                 connections.send(connId, singleStat((short) Message.Type.LOGSTAT.ordinal(), client));
         }
     }
@@ -182,10 +182,20 @@ public class Control {
         }
         Client me = idToClient.get(connId);
         LinkedList<String> statUsernames = stat.getUsernames();
+
+        // verify all usernames are registered
+        for (String username : statUsernames) {
+            if (!isRegistered(username)) {
+                connections.send(connId, new Error((short) Message.Type.STAT.ordinal()));
+                return;
+            }
+        }
+
+        // all usernames are registered
         for (String username : statUsernames) {
             if (isRegistered(username)) { // send stat of registered requested users
                 Client current = usernameToClient.get(username);
-                if (!current.isBlocked(me))
+                if (!isBlockedBiDi(me, current))
                     connections.send(connId, singleStat((short) Message.Type.STAT.ordinal(), current));
             }
         }
@@ -219,6 +229,10 @@ public class Control {
             }
             connections.send(connId, new Ack((short) Message.Type.BLOCK.ordinal()));
         }
+    }
+
+    private boolean isBlockedBiDi(Client a, Client b) {
+        return a.isBlocked(b) | b.isBlocked(a);
     }
 
 }
