@@ -29,7 +29,7 @@ public class BGSProtocol implements BidiMessagingProtocol<Message>{
                 control.handleLogin((Login) msg);
                 break;
             case LOGOUT:
-                control.handleLogout((Logout) msg); // TODO: need to call disconnect?? we don't want to remove from map
+                control.handleLogout((Logout) msg);
                 shouldTerminate = true;
                 break;
             case FOLLOW:

@@ -2,8 +2,10 @@ package bgu.spl.net.srv;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
 import bgu.spl.net.api.bidi.BGSEncoderDecoder;
+import bgu.spl.net.api.bidi.BGSProtocol;
 import bgu.spl.net.api.bidi.BidiMessagingProtocol;
 import bgu.spl.net.api.bidi.Connections;
+import bgu.spl.net.api.messages.Message;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -39,6 +41,7 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
         this.connections = connections;
         this.connId = connId;
         ((BGSEncoderDecoder) encdec).setConnId(connId); // todo: casting??
+        ((BGSProtocol) protocol).setHandler((ConnectionHandler<Message>) this);
         protocol.start(connId, connections);
     }
 
