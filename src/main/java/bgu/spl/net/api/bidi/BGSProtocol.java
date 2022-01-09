@@ -29,8 +29,7 @@ public class BGSProtocol implements BidiMessagingProtocol<Message>{
                 control.handleLogin((Login) msg);
                 break;
             case LOGOUT:
-                control.handleLogout((Logout) msg);
-                shouldTerminate = true;
+                shouldTerminate = control.handleLogout((Logout) msg);
                 break;
             case FOLLOW:
                 control.handleFollow((Follow) msg);
