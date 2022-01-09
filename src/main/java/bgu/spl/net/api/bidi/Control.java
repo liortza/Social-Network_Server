@@ -55,16 +55,17 @@ public class Control {
         while (!notifications.isEmpty()) connections.send(connId, notifications.remove());
     }
 
-    public void handleLogout(Logout logout) {
+    public boolean handleLogout(Logout logout) {
         int connId = logout.getConnId();
         if (!isLoggedIn(connId)) {
             connections.send(connId, new Error((short) Message.Type.LOGOUT.ordinal()));
-            return;
+            return false;
         }
         idToClient.get(connId).logOut();
         idToClient.remove(connId);
         connections.send(connId, new Ack((short) Message.Type.LOGOUT.ordinal()));
         connections.disconnect(connId);
+        return true;
     }
 
     public void handleFollow(Follow follow) {

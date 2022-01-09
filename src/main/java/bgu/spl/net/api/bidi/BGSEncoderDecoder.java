@@ -110,7 +110,7 @@ public class BGSEncoderDecoder implements MessageEncoderDecoder<Message> {
 
     private Message buildPost() {
         if (msgInput.length != 1) return null;
-        String content = msgInput[0]; // TODO: check original content stays ok
+        String content = msgInput[0];
         LinkedList<String> taggedUsers = new LinkedList<>();
         int startIndex, endIndex;
         while (content.contains("@")) {
